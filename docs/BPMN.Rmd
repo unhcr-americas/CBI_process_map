@@ -1,0 +1,123 @@
+---
+title: "BPMN Visualization - R Package"
+output: html_document
+--- 
+This project is an R package for visualizing process execution data on BPMN diagrams, using overlays, style customization and interactions.
+
+It is made possible by [htmlwidgets](http://www.htmlwidgets.org/), which provides an easy-to-use framework for bringing together R and the [BPMN Visualization](https://github.com/process-analytics/bpmn-visualization-js) TypeScript library.
+ 
+ 
+ https://process-analytics.github.io/bpmn-visualization-js/#_live_examples
+ 
+https://medium.com/@process-analytics/hacktoberfest-2021-with-process-analytics-44eecc238ead 
+Build your process map (i.e a .bpmn file ) with Camunda - https://camunda.com/download/modeler/ 
+
+#### Install _BPMN Visualization - R Package_ from GitHub
+
+ 
+```{r}
+#devtools::install_github("process-analytics/bpmn-visualization-R")
+```
+
+Then, make the library available to the current R project:
+```{r}
+library(bpmnVisualization)
+```
+
+### Load the BPMN file
+`bpmnVisualization` accepts a BPMN file (or an XML document):
+
+  The package provides some [BPMN examples](./inst/examples). \
+They are taken from the [BPMN 2.0 examples non-normative machine readable files](https://www.omg.org/spec/BPMN/2.0).
+- Email_Voting.bpmn
+- Nobel_Prize_Process.bpmn
+- Order_Process_for_Pizza_V4.bpmn
+- Travel_Booking.bpmn
+
+```{r}
+# File from the package
+bpmn_file <- system.file("examples/Order_Process_for_Pizza_V4.bpmn", package = "bpmnVisualization")
+```
+
+
+```{r}
+# File from the package
+#bpmn_file <- system.file("examples/Nobel_Prize_Process.bpmn", package = "bpmnVisualization")
+```
+
+
+```{r}
+# File from the package
+#bpmn_file <- system.file("examples/Travel_Booking.bpmn", package = "bpmnVisualization")
+```
+
+
+```{r}
+# File from the package
+#bpmn_file <- system.file("examples/Email_Voting.bpmn", package = "bpmnVisualization")
+```
+
+Or
+```{r}
+#bpmn_file <- file.choose()
+```
+
+Or
+```{r}
+bpmn_file <- here::here("data-raw", "CBI.bpmn")
+```
+
+Or
+```{r}
+#bpmn_file <- "<?xml version="1.0" encoding="UTF-8"?> ...xml_content"
+```
+
+
+
+
+### Display the BPMN diagram
+```{r}
+bpmnVisualization::display(bpmn_file)
+```
+
+
+### Display the BPMN diagram with overlays
+
+```{r}
+# overlays <- list(bpmnVisualization::create_overlay("bpmn_element_id_1", "42"), 
+#                  bpmnVisualization::create_overlay("bpmn_element_id_2", "9"))
+# bpmnVisualization::display(bpmn_file, overlays)
+```
+
+
+### Integrate in Shiny Applications
+
+The following displays a BPMN diagram provided as an example by the package with an overlay on top of a BPMN element.
+
+```{r}
+# Install and load the shiny package
+# install.packages("shiny")
+# library(shiny)
+# 
+# 
+# displayBpmn <- function() {
+#     bpmn_file <- system.file("examples/Travel_Booking.bpmn", package = "bpmnVisualization")
+#     overlays <- list(bpmnVisualization::create_overlay("_6-203", "9"))
+#     bpmnVisualization::display(bpmn_file, overlays)
+# }
+# 
+# ui <- shinyUI(fluidPage(
+#     titlePanel("Display bpmn diagrams with execution data"),
+#     bpmnVisualization::bpmnVisualizationOutput('bpmnContainer')
+#   )
+# )
+# 
+# server = function(input, output) {
+#     # renderBpmnVisualization is the R bridge function to the html widgets
+#     output$bpmnContainer <- bpmnVisualization::renderBpmnVisualization({ displayBpmn() })
+# }
+# 
+# shinyApp(ui, server)
+```
+
+ 

@@ -1,0 +1,276 @@
+---
+title: "Mapping & Mining Cash Based Intervention Process"
+subtitle: ""
+date: "`r format(Sys.Date(),  '%d %B %Y')`"
+author:
+  - name: 
+    affiliation: 
+    email: email@unhcr.org
+output:
+  unhcrdown::html_page:
+    toc: true
+    toc_depth: 2
+    toc_float: true    
+#output: unhcrdown::html_slides    
+# output:
+#   unhcrdown::paged_simple:
+#     back_html: true
+# paged-footnotes: true
+# links-to-footnotes: true
+# uncomment this line to produce HTML and PDF in RStudio:
+#knit: pagedown::chrome_print
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE, 
+                      collapse = FALSE,
+                      comment = "#>",
+                      fig.align = "center")
+knitr::opts_chunk$set(fig.width = 9, 
+                      fig.height = 7)
+set.seed(1)
+extrafont::loadfonts(quiet=TRUE)
+options(scipen = 999) # turn-off scientific notation like 1e+48
+library(tidyverse)
+library(bupaR)
+library(edeaR)
+library(eventdataR)
+library(processmapR)
+library(processmonitR)
+library(xesreadR)
+library(petrinetR)
+#devtools::install_github("process-analytics/bpmn-visualization-R")
+library(bpmnVisualization) 
+```
+
+> “It is not enough to do your best; you must know what to do, and then do your best.” - “If you can't describe what you are doing as a process, you don't know what you're doin" -- Edward Deming
+
+Process Mapping is a method for displaying processes that involves multiple transactions and activities. It generates visual representations of the work-flow of activities that needs to orchestrated within a full process in order to allow people unfamiliar with the process to understand the interaction of causes during the work-flow.
+
+Adopting process maps and linked process mining allows to reduce risk by filling Information gaps. They insuflate better collective ownership by clarifying roles and responsibility and they are required for Trends Monitoring & harmonized Comparisons between contexts. Process Event Monitoring  uses specific measures not only to understand how activities are connected but also to improve __efficiency__ in terms of resources allocation and to identify potential __bottlenecks__ in terms of delay.
+
+
+## What are the Intervention Events during cash interventions?
+
+ * Outreached
+ * Intake Registration
+ * Post-Distribution Monitored
+ * Assessed as Eligible
+ * Assessed as Not Eligible
+ * Appealed
+ * Re-assessed
+ * Enrolled / prioritized
+ * Not-enrolled
+ * Notified
+ * Assisted
+
+
+```{r fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
+bpmn_file <- here::here("data-raw", "CBI.bpmn")
+ 
+bpmnVisualization::display(bpmn_file)
+``` 
+
+Process mining is based __event log__ which need to include the case to which the event belongs, the activity the event refers to, the stage in the transactional life cycle, the life cycle classifier of the event log, the timestamp of the event, the resource used by the activity (This can be a staff - a budget or a contract service for instances & the order to handle sort events with equal timestamps 
+
+
+
+
+```{r}
+
+
+#  * __case_id__ : The case to which the event belongs. (A character vector containing variable names of length 1 or more).
+# 
+#  * __activity_id__ : The activity the event refers to. (A character vector containing variable names of length 1 or more).
+# 
+#  * __activity_instance_id__ : The stage in the transactional life cycce.
+# 
+#  * __lifecycle_id__ : The life cycle classifier of the event log.
+# 
+#  * __timestamp__ : The timestamp of the event. (Should refer to a Date or POSIXct field).
+# 
+#  * __resource_id__ : The resource identifier of the event log. This can be a staff - a budget or a contract service for instances. A character vector containing variable names of length 1 or more.
+# 
+#  * __order__ : Configure how to handle sort events with equal timestamps: auto will use the order in the original data, alphabetical will sort the activity labels by alphabet, sorted will assume that the data frame is already correctly sorted and has a column '.order', providing a column name will use this column for ordering (can be numeric of character). The latter will never overrule timestamp orderings.
+# 
+# 	
+# When validate is 'TRUE' some basic checks are run on the contents of the event log such as that activity instances are not connected to more than one case or activity. Using 'FALSE' improves the performance by skipping those checks.
+
+
+data("patients")
+#class(patients)
+#head(patients)
+pat <-  patients
+
+pat$process_step <- recode(pat$handling,         
+                            "Registration"="IntakeRegistration / Self-Targeting",         
+                            "Triage and Assessment"="vulnerability Assessment",
+                            "Blood test" = "Assessed as Eligible",       
+                            "MRI SCAN"  = "Notified" , 
+                            "X-Ray" = "Appealed",          
+                            "Discuss Results" = "Received Assistnce" ,
+                            "Check-out" = "Post Distribution Monitoring"           )
+#levels(as.factor(pat$handling))
+pat$lifecycle <- ifelse(pat$handling == "check-out", "Complete", "Incomplete")
+pat$activity_instance_id <- row.names(pat)
+
+myeventlog <- bupaR::eventlog(pat,
+                case_id = "patient",
+                activity_id = "process_step",
+                activity_instance_id = "handling_id",
+              #  lifecycle_id = "lifecycle",
+                timestamp = "time",
+                resource_id = "employee",
+                 validate = TRUE)
+```
+
+# Understand Flows between activities 
+ 
+## How cases have Flowed throughed the process? 
+```{r fig.height=3, fig.width=9}
+
+# The frequency value displayed can be one of the following
+# 
+#     absolute frequency
+#         The absolute number of activity instances and flows
+#     absolute_case frequency
+#         The absolute number of cases behind each activity and flow
+#     relative frequency
+#         The relative number of instances per activity
+#         The relative outgoing flows for each activity
+#     relative_case frequency
+#         The relative number of cases per activity and flow
+
+
+processmapR::process_map(myeventlog, type = frequency("relative"))
+```
+
+
+
+
+## What are the Sequence of Activities?
+
+```{r}
+precedence_matrix <- myeventlog  %>%
+  filter_activity_frequency(percentage = 1.0) %>% 
+  filter_trace_frequency(percentage = .80) %>%    
+  processmapR::precedence_matrix() %>% 
+  plot()
+precedence_matrix
+```
+
+# Check Efficiency of Resource allocation 
+
+## How much Resource are involved by Activity? 
+
+```{r}
+myeventlog %>%
+					resource_involvement("resource-activity") %>%
+					plot()
+```
+
+ 
+
+## How much resources have been used?		 
+
+```{r} 
+plot(edeaR::end_activities(myeventlog, level_of_analysis="resource"))
+```
+
+
+A handover-of-work network
+```{r}
+processmapR::resource_map(myeventlog)
+```
+
+# Identify Bottlenecks in terms of Length & delays 
+
+Three different time metrics can be computed:
+
+ *  throughput time: the time between the very first event of the case and the very last- The throughput time is the time form the very first event to the last event of a case. The levels at which it can be computed are log, trace, or case.
+ 
+ *  processing time: the sum of the duration of all activity instances  - The processing time can be computed at the levels log, trace, case, activity and resource-activity. It can only be calculated when there are both start and end timestamps available for activity instances.
+
+ *  idle time: the time when no activity instance is active - The idle time is the time that there is no activity in a case or for a resource. It can only be calculated when there are both start and end timestamps available for activity instances. It can be computed at the levels trace, resource, case and log, and using different time units.
+
+
+
+## What are is the average, shortest & longest path in the process?
+
+Performance profile
+
+```{r fig.height=2, fig.width=9}
+# There are two different duration types that can be displayed on the edges.
+# 
+#     idle_time: the time between the end of the from-activity, and the start of the to-activity. Can be negative if the from-activity overleaps with the consecutive activity.
+#     inter_start_time: the time between the start of the consecutive activity, including the duration of the from-activity.
+
+
+
+myeventlog %>%
+  filter_activity_frequency(percentage = 1.0) %>% 
+  filter_trace_frequency(percentage = .30) %>%    
+  processmapR::process_map(performance(mean, "mins"), render = T)
+```
+ 
+
+```{r fig.height=2, fig.width=9}
+myeventlog %>%
+  filter_activity_frequency(percentage = 1.0) %>% 
+  filter_trace_frequency(percentage = .30) %>%    
+  processmapR::process_map(performance(min, "mins"), render = T)
+```
+
+
+```{r fig.height=2, fig.width=9}
+myeventlog %>%
+  filter_activity_frequency(percentage = 1.0) %>% 
+  filter_trace_frequency(percentage = .30) %>%    
+  processmapR::process_map(performance(max, "mins"), render = T)
+```
+
+## What is the relative lenght of the full process? 
+
+A dotted chart is a graph in which each activity instance is displayed with a point. The x-axis referce to the time aspect -x: time difference since start case on x-axis, while the y-axis refers to cases, i.e. the ordering of the cases along the y-axis: by start, end, or duration, while the color displayshe activity type.
+
+
+
+
+```{r}
+processmapR::dotted_chart(myeventlog,
+                          x = "relative", 
+                          y ="start",
+                          color = NULL, 
+                          units ="hours")
+```
+
+## How much processing time is spread per activity?
+
+```{r}
+myeventlog %>%
+				processing_time("activity", units = "hours") %>%
+				plot() 
+```
+
+## How much processing time is spread per resource?
+ 				   		  
+
+```{r}
+myeventlog %>%
+				processing_time("resource", units = "hours") %>%
+				plot() 
+```
+ 				   		 
+## What is the Idle Time by Ressouce? 
+
+ 				   		 
+```{r}
+myeventlog %>%
+				idle_time("resource", units = "hours") %>%
+				plot() 
+```
+ 				   		 
+	  
+  
